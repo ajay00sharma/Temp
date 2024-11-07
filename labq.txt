@@ -1,3 +1,420 @@
+CODE-1:
+import java.net.*;  
+import java.io.*;  
+class SocketClient{  
+public static void main(String args[])throws Exception{  
+Socket s=new Socket("localhost",3333);  
+DataInputStream din=new DataInputStream(s.getInputStream());  
+DataOutputStream dout=new DataOutputStream(s.getOutputStream());  
+BufferedReader br=new BufferedReader(new InputStreamReader(System.in));  
+  
+String str="",str2="";  
+while(!str.equals("stop")){  
+str=br.readLine();  
+dout.writeUTF(str);  
+dout.flush();  
+str2=din.readUTF();  
+System.out.println("Server says: "+str2);  
+}  
+  
+dout.close();  
+s.close();  
+}}  
+import java.net.*;  
+import java.io.*;  
+class SocketServer{  
+public static void main(String args[])throws Exception{  
+ServerSocket ss=new ServerSocket(3333);  
+Socket s=ss.accept();  
+DataInputStream din=new DataInputStream(s.getInputStream());  
+DataOutputStream dout=new DataOutputStream(s.getOutputStream());  
+BufferedReader br=new BufferedReader(new InputStreamReader(System.in));  
+  
+String str="",str2="";  
+while(!str.equals("stop")){  
+str=din.readUTF();  
+System.out.println("client says: "+str);  
+str2=br.readLine();  
+dout.writeUTF(str2);  
+dout.flush();  
+}  
+din.close();  
+s.close();  
+ss.close();  
+}} 
+
+CODE-2:
+import java.io.*;
+import java.net.*;
+
+public class TCPServer {
+    public static void main(String[] args) {
+        try (ServerSocket ss = new ServerSocket(4567)) {
+            System.out.println("Server is running and waiting for clients...");
+            while (true) {
+                Socket s = ss.accept();
+                System.out.println("Client connected.");
+                new ClientHandler(s).start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class ClientHandler extends Thread {
+    private Socket socket;
+
+    ClientHandler(Socket socket) {
+        this.socket = socket;
+    }
+
+    public void run() {
+        try {
+            DataInputStream dis = new DataInputStream(socket.getInputStream());
+            DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+
+            String command = dis.readUTF();
+            if (command.equalsIgnoreCase("upload")) {
+                String filename = dis.readUTF();
+                int len = dis.readInt();
+                byte[] data = new byte[len];
+                dis.readFully(data);
+
+                try (FileOutputStream fos = new FileOutputStream(filename)) {
+                    fos.write(data);
+                    System.out.println("File uploaded: " + filename);
+                }
+            } else if (command.equalsIgnoreCase("download")) {
+                String filename = dis.readUTF();
+                File file = new File(filename);
+                if (file.exists()) {
+                    byte[] data = new byte[(int) file.length()];
+                    try (FileInputStream fis = new FileInputStream(file)) {
+                        fis.read(data);
+                    }
+
+                    dos.writeUTF("OK");
+                    dos.writeInt(data.length);
+                    dos.write(data);
+                } else {
+                    dos.writeUTF("ERROR: File not found");
+                }
+            }
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
+
+public class TCPClient {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        while (true) {
+            System.out.println("Enter 'upload' to upload a file, 'download' to download a file, or 'exit' to quit:");
+            String command = scanner.nextLine().trim().toLowerCase();
+
+            if (command.equals("exit")) {
+                System.out.println("Exiting the client.");
+                break;
+            }
+
+            System.out.print("Enter file name: ");
+            String filename = scanner.nextLine().trim();
+
+            if (command.equals("upload")) {
+                uploadFile(filename);
+            } else if (command.equals("download")) {
+                downloadFile(filename);
+            } else {
+                System.out.println("Invalid command. Please enter 'upload' or 'download'.");
+            }
+        }
+
+        scanner.close();
+    }
+
+    private static void uploadFile(String filename) {
+        try (Socket s = new Socket("localhost", 4567);
+             DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+            dos.writeUTF("upload");
+            dos.writeUTF(filename);
+
+            File file = new File(filename);
+            if (!file.exists()) {
+                System.out.println("File not found: " + filename);
+                return;
+            }
+
+            byte[] data = new byte[(int) file.length()];
+            try (FileInputStream fis = new FileInputStream(file)) {
+                fis.read(data);
+            }
+
+            // Encrypt data using Caesar cipher
+            for (int i = 0; i < data.length; i++) {
+                data[i] = (byte) ((data[i] + 3) % 256);
+            }
+
+            dos.writeInt(data.length);
+            dos.write(data);
+            System.out.println("File uploaded: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void downloadFile(String filename) {
+        try (Socket s = new Socket("localhost", 4567);
+             DataOutputStream dos = new DataOutputStream(s.getOutputStream());
+             DataInputStream dis = new DataInputStream(s.getInputStream())) {
+            dos.writeUTF("download");
+            dos.writeUTF(filename);
+
+            String response = dis.readUTF();
+            if (response.equalsIgnoreCase("OK")) {
+                int len = dis.readInt();
+                byte[] data = new byte[len];
+                dis.readFully(data);
+
+                // Decrypt data using Caesar cipher
+                for (int i = 0; i < data.length; i++) {
+                    data[i] = (byte) ((data[i] - 3 + 256) % 256);
+                }
+
+                try (FileOutputStream fos = new FileOutputStream(filename)) {
+                    fos.write(data);
+                }
+                System.out.println("File downloaded: " + filename);
+            } else {
+                System.out.println(response);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}	
+CODE-3:
+INTF:
+//function prototype
+import java.rmi.*;
+
+public interface MyServerIntf extends Remote		//remote interface
+{	int i=0;
+	double add(double a, double b) throws RemoteException;
+}
+
+IMPL:
+import java.rmi.*;
+import java.rmi.server.*;
+
+// UnicastRemoteObject supports for point-to-point active object references (invocations, parameters, and // results) using TCP streams.
+
+public class MyServerImpl extends UnicastRemoteObject implements MyServerIntf
+{
+	MyServerImpl() throws RemoteException
+	{}
+
+	public double add(double a, double b) throws RemoteException
+	{
+		return(a+b);
+	}	
+}
+
+SERVER:
+import java.net.*;
+import java.rmi.*;
+
+public class MyServer
+{
+	public static void main(String[] arg)
+	{
+		try 	
+		{
+			MyServerImpl asi = new MyServerImpl();
+			Naming.rebind("RMServer",asi);  
+			System.out.println("\nServer Started...");
+		}
+		catch(Exception e)
+		{
+			System.out.println("Exception: "+e);
+		}
+	}
+}
+
+CLIENT:
+import java.net.*;
+import java.rmi.*;
+
+public class MyClient
+{
+	public static void main(String[] arg)
+	{
+		try 	
+		{
+		String sName = "rmi://"+arg[0]+"/RMServer";
+		
+		MyServerIntf asif = (MyServerIntf)Naming.lookup(sName);  // requesting remote objects on 							            // the server
+			
+		double d1=2000,d2=500;
+
+		System.out.println("Addition: "+asif.add(d1,d2));
+
+		}
+		catch(Exception e)
+		{
+			System.out.println("Exception: "+e);
+		}
+	}
+}
+
+
+CODE-4:
+NS2(WIRED):
+set ns [new Simulator]
+
+$ns color 0 blue
+$ns color 1 black
+
+
+set tr [open droptail-queue-out.tr w]
+$ns trace-all $tr
+
+set ftr [open droptail-queue-out.nam w]
+$ns namtrace-all $ftr
+
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+
+$ns duplex-link $n0 $n2 5Mb 2ms DropTail
+$ns duplex-link $n1 $n2 10Mb 5ms DropTail
+$ns duplex-link $n2 $n3 4Mb 3ms DropTail
+$ns duplex-link $n3 $n4 100Mb 2ms DropTail
+$ns duplex-link $n3 $n5 15Mb 4ms DropTail
+
+set udp [new Agent/UDP]
+
+$udp set fid_ 1
+set null [new Agent/Null]
+
+$ns attach-agent $n0 $udp 
+$ns attach-agent $n4 $null
+$ns connect $udp $null
+
+set tcp [new Agent/TCP]
+$tcp set fid_ 0
+set sink [new Agent/TCPSink]
+$ns attach-agent $n1 $tcp
+$ns attach-agent $n5 $sink
+$ns connect $tcp $sink
+$ns connect $tcp $sink
+
+set cbr [new Application/Traffic/CBR]
+$cbr attach-agent $udp
+$cbr set interval 0.020
+
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+
+$ftp set interval 0.020
+proc finish {} {
+           global ns tr ftr
+           $ns flush-trace
+           close $tr
+           close $ftr
+           exec nam droptail-queue-out.nam &
+           exec gawk -f analysis.awk droptail-queue-out.tr &
+           exit
+}
+
+$ns at 0.1 "$cbr start"
+$ns at 2.0 "$cbr stop"
+$ns at 0.1 "$ftp start"
+$ns at 2.0 "$ftp stop"
+$ns at 2.1 "finish"
+
+$ns run
+
+
+THROUGHPUT FILE:
+BEGIN {
+  rec= 0
+  drp=0
+  tot=0
+  rat=0.0
+  sum=0
+  sum1=0
+  throughput=0.0
+  throughput1=0.0
+}
+
+{
+  
+  if($1== "r" && $4== 4)
+    {
+    
+      rec++
+    }
+    
+    
+   if($1== "d" && $4 ==4 )
+     
+     {
+       drp++
+       
+     }
+     
+     
+     
+     if($2<1.00 && $4==4)
+      {
+     
+          sum=sum+$6
+ 
+      }
+ 
+    if($2<1.00 && $4==5)
+      {
+     
+          sum1=sum1+$6
+ 
+      }
+ 
+ }
+ 
+ 
+  
+END {
+   
+      tot = rec + drp
+      rat = (rec/tot) *100
+      throughput= (sum*8)/1000000
+      throughput1=(sum1*8)/1000000
+       printf(" \n Packets received %d ", rec)
+       printf(" \n Packets dropped %d ", drp)
+       printf("\n Packets delivery ratio %f",rat)
+        printf("\n Throughput for udp is %f",throughput)
+         
+        printf("\n Throughput for tcp is %f",throughput1)
+     }
+
+EXECUTION:
+~$ cd Desktop/
+ns wired-net.tcl
+nam wired.nam
+awk -f sample.awk wired.tr	
+
+
+
 CONGESTION.tcl
 set ns [new Simulator]
 set f [ open congestion.tr w ]
