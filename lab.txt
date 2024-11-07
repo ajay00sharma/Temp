@@ -1,3 +1,4 @@
+<<<<<<< HEAD:labq.txt
 CODE-1:
 import java.net.*;  
 import java.io.*;  
@@ -657,6 +658,8 @@ END {
 }
 
 
+=======
+>>>>>>> parent of 10a5680 (.):lab.txt
 CONGESTION.tcl
 set ns [new Simulator]
 set f [ open congestion.tr w ]
